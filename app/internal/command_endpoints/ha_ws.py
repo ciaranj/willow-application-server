@@ -11,11 +11,6 @@ from . import (
     CommandEndpointRuntimeException,
 )
 
-
-class HomeAssistantWebSocketEndpointNotSupportedException(CommandEndpointRuntimeException):
-    pass
-
-
 class HomeAssistantWebSocketEndpoint(CommandEndpoint):
     name = "WAS Home Assistant WebSocket Endpoint"
 
