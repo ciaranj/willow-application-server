@@ -1,3 +1,4 @@
+import aiohttp
 import asyncio
 import json
 import requests
@@ -33,21 +34,29 @@ class HomeAssistantWebSocketEndpoint(CommandEndpoint):
         self.ha_willow_devices_request_id = None
         self.haws = None
 
-        if not self.is_supported():
-            raise HomeAssistantWebSocketEndpointNotSupportedException
-
         loop = asyncio.get_event_loop()
+
         self.task = loop.create_task(self.connect())
 
-    def is_supported(self):
+    async def is_supported(self):
         headers = {}
         headers['Content-Type'] = 'application/json'
         headers['Authorization'] = f"Bearer {self.token}"
         ha_components_url = f"{self.construct_url(False)}/api/components"
-        response = requests.get(ha_components_url, headers=headers)
 
-        if "assist_pipeline" in response.json():
-            return True
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(
+                    ha_components_url,
+                    headers=headers
+                ) as resp,
+            ):
+                j = await resp.json()
+                if "assist_pipeline" in j:
+                    return True
+        except Exception as ex:
+            self.log.warning(f"Problem connecting to WAS {ha_components_url}: {ex}")
 
         return False
 
@@ -63,11 +72,15 @@ class HomeAssistantWebSocketEndpoint(CommandEndpoint):
     async def connect(self):
         while True:
             try:
-                # deflate compression is enabled by default, making tcpdump difficult
-                async with websockets.connect(f"{self.url}/api/websocket", compression=None) as self.haws:
-                    while True:
-                        msg = await self.haws.recv()
-                        await self.cb_msg(msg)
+                if await self.is_supported():
+                    # deflate compression is enabled by default, making tcpdump difficult
+                    async with websockets.connect(f"{self.url}/api/websocket", compression=None) as self.haws:
+                        while True:
+                            msg = await self.haws.recv()
+                            await self.cb_msg(msg)
+                else:
+                    await asyncio.sleep(5)
+
             except Exception as e:
                 self.log.info(f"{self.name}: exception occurred: {e}")
                 await asyncio.sleep(1)
