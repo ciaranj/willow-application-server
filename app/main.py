@@ -247,6 +247,9 @@ async def websocket_endpoint(
                 elif msg["cmd"] == "get_config":
                     asyncio.ensure_future(websocket.send_text(build_msg(get_config_db(), "config")))
 
+            elif "response_end" in msg:
+                app.command_endpoint.send_fnf_event(event="response_end", ws=websocket, client=client)
+
             elif "goodbye" in msg:
                 app.connmgr.disconnect(websocket)
 
